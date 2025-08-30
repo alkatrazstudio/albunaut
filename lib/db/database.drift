@@ -1,0 +1,256 @@
+import '../util/filter.dart';
+
+CREATE TABLE artists (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    filterListAbbr TEXT NOT NULL DEFAULT '',
+    lastUpdatedAt INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX artists_name ON artists(name);
+CREATE INDEX artists_filterListAbbr ON artists(filterListAbbr);
+
+CREATE TABLE releaseGroupTypes (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL
+);
+CREATE UNIQUE INDEX releaseGroupTypes_name ON releaseGroupTypes(name);
+
+CREATE TABLE releaseGroups (
+    id TEXT NOT NULL PRIMARY KEY,
+    artistId TEXT NOT NULL REFERENCES artists(id),
+    coverReleaseId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    typeId INTEGER NOT NULL REFERENCES releaseGroupTypes(id),
+    date TEXT NOT NULL,
+    isIgnored BOOL NOT NULL DEFAULT FALSE,
+    hasHiddenType BOOL NOT NULL DEFAULT FALSE
+);
+CREATE INDEX releaseGroups_name ON releaseGroups(name);
+CREATE INDEX releaseGroups_isIgnored ON releaseGroups(isIgnored);
+CREATE INDEX releaseGroups_artistId ON releaseGroups(artistId);
+CREATE INDEX releaseGroups_typeId ON releaseGroups(typeId);
+CREATE INDEX releaseGroups_artistId_isIgnored ON releaseGroups(artistId, isIgnored);
+CREATE INDEX releaseGroups_artistId_hasHiddenType_isIgnored ON releaseGroups(artistId, hasHiddenType, isIgnored);
+
+CREATE TABLE releaseGroupSecondaryTypes (
+     releaseGroupId TEXT NOT NULL REFERENCES releaseGroups(id),
+     typeId INTEGER NOT NULL REFERENCES releaseGroupTypes(id)
+);
+CREATE INDEX releaseGroupSecondaryTypes_releaseGroupId ON releaseGroupSecondaryTypes(releaseGroupId);
+CREATE INDEX releaseGroupSecondaryTypes_typeId ON releaseGroupSecondaryTypes(typeId);
+
+CREATE TABLE releases (
+    id TEXT NOT NULL PRIMARY KEY,
+    releaseGroupId TEXT NOT NULL REFERENCES releaseGroups(id)
+);
+CREATE INDEX releases_releaseGroupId ON releases(releaseGroupId);
+
+CREATE TABLE recordings (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    releaseId TEXT NOT NULL
+);
+CREATE INDEX recordings_name ON recordings(name);
+CREATE INDEX recordings_releaseId ON recordings(releaseId);
+
+CREATE TABLE listens (
+    listenedAt INTEGER NOT NULL,
+    recordingId TEXT NULL,
+    artistName TEXT NULL,
+    releaseName TEXT NULL,
+    trackName TEXT NULL
+);
+CREATE INDEX listens_recordingId ON listens(recordingId);
+
+CREATE TABLE artistStats (
+    artistId TEXT NOT NULL PRIMARY KEY REFERENCES artists(id),
+    listensTotal INTEGER NOT NULL,
+    listensWeek INTEGER NOT NULL,
+    listensMonth INTEGER NOT NULL,
+    listensYear INTEGER NOT NULL,
+    listenFirst INTEGER NOT NULL,
+    listenLatest INTEGER NOT NULL
+);
+
+CREATE TABLE releaseGroupStats (
+    releaseGroupId TEXT NOT NULL PRIMARY KEY REFERENCES releaseGroups(id),
+    listensTotal INTEGER NOT NULL,
+    listensWeek INTEGER NOT NULL,
+    listensMonth INTEGER NOT NULL,
+    listensYear INTEGER NOT NULL,
+    listenFirst INTEGER NOT NULL,
+    listenLatest INTEGER NOT NULL
+);
+
+CREATE TABLE filterPresets (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    listenedCriteria ENUM(ListenedCriteria) NOT NULL,
+    artistListFilter ENUM(ArtistListFilter) NOT NULL,
+    entryType ENUM(EntryType) NOT NULL,
+    isAscending BOOL NOT NULL,
+    listSortParam ENUM(ListSortParam) NOT NULL,
+    ignoredInclusion ENUM(IgnoredInclusion) NOT NULL
+);
+
+---
+
+getMaxListenedAt: SELECT MAX(listenedAt) FROM listens;
+
+getListen: SELECT * FROM listens WHERE (recordingId = :recordingId OR recordingId IS NULL) AND listenedAt = :listenedAt LIMIT 1;
+getRecording: SELECT * FROM recordings WHERE id = :id;
+getRelease: SELECT * FROM releases WHERE id = :id;
+getReleaseByGroup: SELECT * FROM releases WHERE releaseGroupId = :releaseGroupId ORDER BY id ASC LIMIT 1;
+getReleaseGroup: SELECT * FROM releaseGroups WHERE id = :id;
+getReleaseGroupTypeIdByName: SELECT id FROM releaseGroupTypes WHERE name = :name;
+getArtist: SELECT * FROM artists WHERE id = :id;
+
+addListen: INSERT INTO listens $listen;
+addRecording: INSERT INTO recordings $recording;
+addRelease: INSERT INTO releases $release;
+addReleaseGroup: INSERT INTO releaseGroups $releaseGroup;
+addReleaseGroupType: INSERT INTO releaseGroupTypes (name) VALUES (:name) ON CONFLICT DO NOTHING;
+addReleaseGroupSecondaryType: INSERT INTO releaseGroupSecondaryTypes (releaseGroupId, typeId) VALUES (:releaseGroupId, :typeId);
+addArtist: INSERT INTO artists $artist;
+addFilterPreset: INSERT INTO filterPresets $filterPreset;
+
+getArtistIds: SELECT id FROM artists;
+getReleaseGroupsForArtist: SELECT * FROM releaseGroups WHERE artistId = :artistId;
+setArtistUpdated: UPDATE artists SET lastUpdatedAt = :updatedAt WHERE id = :artistId;
+
+getReleaseGroups AS ReleaseGroupsListResult:
+    SELECT g.** AS releaseGroup, a.** AS artist, g_s.** AS releaseGroupStats, a_s.** AS artistStats
+    FROM artists AS a
+    CROSS JOIN releaseGroups AS g ON (g.artistId = a.id)
+    LEFT JOIN releaseGroupStats AS g_s ON (g_s.releaseGroupId = g.id)
+    LEFT JOIN artistStats AS a_s ON (a_s.artistId = a.id)
+    WHERE $condition
+        AND NOT g.hasHiddenType
+        AND (g.name LIKE :search ESCAPE '\' OR a.name LIKE :search ESCAPE '\')
+    ORDER BY $order, g.date DESC, g.id ASC
+    LIMIT :limit OFFSET :offset;
+
+getArtists AS ArtistsListResult:
+    SELECT a.** AS artist, g_s.** AS releaseGroupStats, a_s.** AS artistStats, MAX(g.date) AS lastReleaseGroupDate
+    FROM artists AS a
+    CROSS JOIN releaseGroups AS g ON (g.artistId = a.id)
+    LEFT JOIN releaseGroupStats AS g_s ON (g_s.releaseGroupId = g.id)
+    LEFT JOIN artistStats AS a_s ON (a_s.artistId = a.id)
+    WHERE $condition
+        AND NOT g.hasHiddenType
+        AND a.name LIKE :search ESCAPE '\'
+    GROUP BY a.id
+    ORDER BY $order, MAX(g.date) ASC, a.id ASC
+    LIMIT :limit OFFSET :offset;
+
+getFullReleaseGroup:
+    SELECT g.** AS releaseGroup, gt.** AS type, a.** AS artist, g_s.** AS stats, a_s.** AS artistStats,
+        LIST(
+            SELECT * FROM releaseGroupSecondaryTypes AS gst
+            CROSS JOIN releaseGroupTypes AS st ON (st.id = gst.typeId)
+            WHERE gst.releaseGroupId = g.id
+        ) AS secondaryTypes
+    FROM releaseGroups AS g
+    CROSS JOIN releaseGroupTypes AS gt ON (gt.id = g.typeId)
+    CROSS JOIN artists AS a ON (a.id = g.artistId)
+    LEFT JOIN releaseGroupStats AS g_s ON (g_s.releaseGroupId = g.id)
+    LEFT JOIN artistStats AS a_s ON (a_s.artistId = a.id)
+    WHERE g.id = :id;
+
+getFullArtist:
+    SELECT a.** AS artist, s.** AS stats
+    FROM artists AS a
+    LEFT JOIN artistStats AS s ON (s.artistId = a.id)
+    WHERE a.id = :id;
+
+clearArtistStats: DELETE FROM artistStats;
+
+updateArtistStats:
+    INSERT INTO artistStats (
+        artistId, listensTotal, listensWeek, listensMonth, listensYear, listenFirst, listenLatest
+    )
+    SELECT
+        g.artistId,
+        COUNT(l.listenedAt) AS listensTotal,
+        SUM(IIF(l.listenedAt > :weekTS, 1, 0)) AS listensWeek,
+        SUM(IIF(l.listenedAt > :monthTS, 1, 0)) AS listensMonth,
+        SUM(IIF(l.listenedAt > :yearTS, 1, 0)) AS listensYear,
+        MIN(l.listenedAt) AS listenFirst,
+        MAX(l.listenedAt) AS listenLatest
+    FROM releaseGroups AS g
+    CROSS JOIN releases AS r ON (r.releaseGroupId = g.id)
+    CROSS JOIN recordings AS rec ON (rec.releaseId = r.id)
+    CROSS JOIN listens AS l ON (l.recordingId = rec.id)
+    GROUP BY g.artistId;
+
+clearReleaseGroupStats: DELETE FROM releaseGroupStats;
+
+updateReleaseGroupStats:
+    INSERT INTO releaseGroupStats (
+        releaseGroupId, listensTotal, listensWeek, listensMonth, listensYear, listenFirst, listenLatest
+    )
+    SELECT
+        r.releaseGroupId,
+        COUNT(l.listenedAt) AS listensTotal,
+        SUM(IIF(l.listenedAt > :weekTS, 1, 0)) AS listensWeek,
+        SUM(IIF(l.listenedAt > :monthTS, 1, 0)) AS listensMonth,
+        SUM(IIF(l.listenedAt > :yearTS, 1, 0)) AS listensYear,
+        MIN(l.listenedAt) AS listenFirst,
+        MAX(l.listenedAt) AS listenLatest
+    FROM releases AS r
+    CROSS JOIN recordings AS rec ON (rec.releaseId = r.id)
+    CROSS JOIN listens AS l ON (l.recordingId = rec.id)
+    GROUP BY r.releaseGroupId;
+
+updateReleaseGroupsHasHiddenType:
+    UPDATE releaseGroups AS g
+    SET hasHiddenType = IFNULL(t.hasHiddenType, FALSE)
+    FROM (
+        SELECT g.id AS releaseGroupId, (gt.name IN :hiddenTypeNames) OR MAX(gts.name IN :hiddenTypeNames) AS hasHiddenType
+        FROM releaseGroups AS g
+        LEFT JOIN releaseGroupTypes AS gt ON (gt.id = g.typeId)
+        LEFT JOIN releaseGroupSecondaryTypes AS st ON (st.releaseGroupId = g.id)
+        LEFT JOIN releaseGroupTypes AS gts ON (gts.id = st.typeId)
+        GROUP BY g.id
+    ) AS t
+    WHERE g.id = t.releaseGroupId;
+
+setReleaseGroupIsIgnored: UPDATE releaseGroups SET isIgnored = :isIgnored WHERE id = :id;
+setArtistFilterList: UPDATE artists SET filterListAbbr = :listAbbr WHERE id = :id;
+
+getArtistReleaseGroups:
+    SELECT g.** AS releaseGroup, gt.** AS releaseGroupType, s.** AS stats, GROUP_CONCAT(gst.name) AS secondaryTypeNames
+    FROM releaseGroups AS g
+    LEFT JOIN releaseGroupStats AS s ON (s.releaseGroupId = g.id)
+    LEFT JOIN releaseGroupTypes AS gt ON (gt.id = g.typeId)
+    LEFT JOIN releaseGroupSecondaryTypes AS st ON (st.releaseGroupId = g.id)
+    LEFT JOIN releaseGroupTypes AS gst ON (gst.id = st.typeId)
+    WHERE g.artistId = :artistId
+    GROUP BY g.id
+    ORDER BY g.date DESC, g.id;
+
+getReleaseGroupTypes: SELECT name FROM releaseGroupTypes;
+
+getArtistsForUpdate: SELECT id FROM artists WHERE lastUpdatedAt < :maxLastUpdatedAt ORDER BY lastUpdatedAt ASC;
+
+getListens:
+    SELECT ln.** AS listen, rec.** AS recording, relG.** AS releaseGroup, rel.** AS "release", a.** AS artist
+    FROM listens AS ln
+    LEFT JOIN recordings AS rec ON (rec.id = ln.recordingId)
+    LEFT JOIN releases AS rel ON (rel.id = rec.releaseId)
+    LEFT JOIN releaseGroups AS relG ON (relG.id = rel.releaseGroupId)
+    LEFT JOIN artists AS a ON (a.id = relG.artistId)
+    WHERE (
+        a.name LIKE :search ESCAPE '\'
+        OR relG.name LIKE :search ESCAPE '\'
+        OR rec.name LIKE :search ESCAPE '\'
+        OR ln.trackName LIKE :search ESCAPE '\'
+        OR ln.releaseName LIKE :search ESCAPE '\'
+        OR ln.artistName LIKE :search ESCAPE '\'
+    )
+    GROUP BY ln.listenedAt
+    ORDER BY $order
+    LIMIT :limit OFFSET :offset;
+
+getFilterPresets: SELECT * FROM filterPresets ORDER BY id;
+removeFilterPreset: DELETE FROM filterPresets WHERE id = :id;

@@ -1,0 +1,48 @@
+name: albunaut
+description: Display ListenBrainz stats
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  flutter: ^3.35.1
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  collection: any
+  drift: 2.28.1
+  file_picker: 10.3.2
+  intl: any
+  path: 1.9.1
+  path_provider: 2.1.5
+  shared_preferences: 2.5.3
+  sqlite3: 2.9.0
+  sqlite3_flutter_libs: 0.5.39
+  url_launcher: 6.3.2
+
+  help_page:
+    git:
+      url: https://github.com/z80maniac/flutter_help_page.git
+      ref: 0873b722c74c0abe387eea09059e210361459775
+  mega_form:
+    git:
+      url: https://github.com/z80maniac/mega_form.git
+      ref: b1011717bb182cd6518debafeffa4e16510c1dac
+  pad5:
+    git:
+      url: https://github.com/z80maniac/pad5.git
+      ref: 33f4004b677409f56a77415ce55d14a4157c28e0
+  typed_prefs:
+    git:
+      url: https://github.com/z80maniac/typed_prefs.git
+      ref: 3a8479fb534bbe111df4e64334046667974b638a
+
+dev_dependencies:
+  build_runner: 2.7.0
+  drift_dev: 2.28.1
+  flutter_lints: 6.0.0
+
+flutter:
+  uses-material-design: true
