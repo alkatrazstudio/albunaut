@@ -1,7 +1,7 @@
 name: albunaut
 description: Display ListenBrainz stats
 publish_to: none
-version: 0.1.0+1
+version: 0.1.1+2
 
 environment:
   flutter: ^3.35.1
