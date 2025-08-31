@@ -25,7 +25,7 @@ class ListenStatsCard extends StatelessWidget {
     var listensTotal = artistStats?.listensTotal ?? releaseGroupStats?.listensTotal ?? 0;
     var listensWeek = artistStats?.listensWeek ?? releaseGroupStats?.listensWeek ?? 0;
     var listensMonth = artistStats?.listensMonth ?? releaseGroupStats?.listensMonth ?? 0;
-    var listensYear = artistStats?.listensTotal ?? releaseGroupStats?.listensTotal ?? 0;
+    var listensYear = artistStats?.listensYear ?? releaseGroupStats?.listensYear ?? 0;
     var listenLatest = artistStats?.listenLatest ?? releaseGroupStats?.listenLatest ?? 0;
     var listenFirst = artistStats?.listenFirst ?? releaseGroupStats?.listenFirst ?? 0;
 
