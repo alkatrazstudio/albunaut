@@ -4,32 +4,32 @@ publish_to: none
 version: 0.1.1+2
 
 environment:
-  flutter: ^3.35.1
-  sdk: ^3.9.0
+  flutter: ^3.38.5
+  sdk: ^3.10.4
 
 dependencies:
   flutter:
     sdk: flutter
 
   collection: any
-  drift: 2.28.1
-  file_picker: 10.3.2
+  drift: 2.30.0
+  file_picker: 10.3.8
   intl: any
   path: 1.9.1
   path_provider: 2.1.5
-  shared_preferences: 2.5.3
-  sqlite3: 2.9.0
-  sqlite3_flutter_libs: 0.5.39
+  shared_preferences: 2.5.4
+  sqlite3: 2.9.4
+  sqlite3_flutter_libs: 0.5.41
   url_launcher: 6.3.2
 
   help_page:
     git:
       url: https://github.com/z80maniac/flutter_help_page.git
-      ref: 0873b722c74c0abe387eea09059e210361459775
+      ref: c6e76a5b30a33cce197f80643fbb5f44551ee86a
   mega_form:
     git:
       url: https://github.com/z80maniac/mega_form.git
-      ref: b1011717bb182cd6518debafeffa4e16510c1dac
+      ref: e93145d5010476a296df7623676da5631a24673f
   pad5:
     git:
       url: https://github.com/z80maniac/pad5.git
@@ -37,11 +37,11 @@ dependencies:
   typed_prefs:
     git:
       url: https://github.com/z80maniac/typed_prefs.git
-      ref: 3a8479fb534bbe111df4e64334046667974b638a
+      ref: 031b1bd7aa133ba9c40b5a1804ba32c8e37a13ba
 
 dev_dependencies:
-  build_runner: 2.7.0
-  drift_dev: 2.28.1
+  build_runner: 2.10.4
+  drift_dev: 2.30.0
   flutter_lints: 6.0.0
 
 flutter:

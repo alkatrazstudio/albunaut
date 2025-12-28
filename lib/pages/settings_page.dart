@@ -113,7 +113,7 @@ class SettingsPage extends StatelessWidget {
                         label: 'Hide release types',
                         name: 'hideReleaseGroupsTypes',
                         initialValue: appConfig.hideReleaseGroupsTypes,
-                        options: options,
+                        options: MegaFormFieldStringListChip.optionsFromStrings(options),
                         selectedColor: Theme.of(context).colorScheme.onError,
                       );
                     },
