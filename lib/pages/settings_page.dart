@@ -55,6 +55,7 @@ class SettingsPage extends StatelessWidget {
       }
     }
     json['userName'] = userName;
+    json['hideReleaseGroupsTypes'] = (json['hideReleaseGroupsTypes'] as List).cast<String>();
     appConfig.applyJson(json);
 
     await Manager.updateReleaseGroupsHasHiddenType();
